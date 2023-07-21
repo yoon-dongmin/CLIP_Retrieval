@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import clip
 from PIL import Image
+import torch.nn as nn
+import torchvision.models as models
 parser = argparse.ArgumentParser()
 #annotated verb-object pairs data
 parser.add_argument('--inputVO', type=str, default='data/ovpair.csv', help='input verb-object file') 
@@ -29,6 +31,7 @@ with open('data/vo_dict.json', 'r') as vo:
 with open('data/ov_dict.json', 'r') as ov: 
     ov_dict = json.load(ov)
 # print(len(ov_dict),3333)
+
 
 object_list = list(ov_dict.keys())
 random.shuffle(object_list)
@@ -92,20 +95,20 @@ test = [test1,test2,test3,test4,test5]
 #     for i in test:
 #         f.write(json.dumps(i)) #json 문자열로 변환
 
-
-
 # print(len(train1))
 
 
+
+
 ###CLIP affordance 생성###
-# ##train의 이미지 경로###
+###train의 이미지 경로###
 # label_path = {}
 # with open('data/image_label.json') as data: #이거는 안보임 imagemet데이터에서 만듦
 #     for line in data:
 #         image_label = json.loads(line) #iamge_label => key : image_name, value : name
 #     # print(image_label)
 
-#     dir = 'data/ILSVRC2012_img_val/Images/imagenet' #이미지셋의 경로로 변경
+#     dir = 'ILSVRC2012_img_val/Images/imagenet' #이미지셋의 경로로 변경
 #     for f in os.listdir(dir): #지정한 디렉토리 내의 모든 파일과 디렉토리 리스트를 리턴
 #         obj = str(image_label[f]).lower()
 #         if obj in train1:
@@ -113,7 +116,7 @@ test = [test1,test2,test3,test4,test5]
 #                 label_path[obj] = []
 #             label_path[obj].append(f)
 
-# with open('data/RN50/label_path.json', 'w+') as f: 
+# with open('data/label_path.json', 'w+') as f: 
 #     f.write(json.dumps(label_path)) #json 문자열로 변환
 
 
@@ -123,8 +126,14 @@ test = [test1,test2,test3,test4,test5]
 #         print(label)
 
 #-----LOAD MODEL-----#
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("RN101") #ViT-B/32 #RN101 #RN50
+model = models.resnet101(pretrained=True)
+_, preprocess = clip.load("RN101") #ViT-B/32 #RN101 #RN50
+
+
+# Access average pooling layer in network
+model_avgpool = nn.Sequential(*list(model.children())[:-1])
+model_avgpool.eval()
+
 
 
 ###Train 이미지 임베딩 생성###
@@ -146,23 +155,23 @@ with open('data/image_label.json') as data: #이거는 안보임 imagemet데이�
             # move the input and model to GPU for speed if available
             if torch.cuda.is_available():
                 input_batch = input_batch.to('cuda')
-                model.to('cuda')
+                model_avgpool.to('cuda')
                 #print(input_batch.shape)
             with torch.no_grad():
                 try:
-                    output = model.encode_image(input_batch) #이미지를 모델에 넣음
+                    output = model_avgpool(input_batch) #이미지를 모델에 넣음
                 except:
                     print(os.path.join(dir, f))
                 label_embedding[obj].append(output[0].tolist())
 
 
-
-with open('data/RN101/label_embedding5.json', 'w+') as f: 
+with open('data/Resnet101/label_embedding5.json', 'w+') as f: 
     f.write(json.dumps(label_embedding)) #json 문자열로 변환
 
 
 
-# ###Test 이미지 임베딩 생성###
+
+###Test 이미지 임베딩 생성###
 label_embedding = {}
 with open('data/image_label.json') as data: #이거는 안보임 imagemet데이터에서 만듦
     for line in data:
@@ -181,16 +190,16 @@ with open('data/image_label.json') as data: #이거는 안보임 imagemet데이�
             # move the input and model to GPU for speed if available
             if torch.cuda.is_available():
                 input_batch = input_batch.to('cuda')
-                model.to('cuda')
+                model_avgpool.to('cuda')
                 #print(input_batch.shape)
             with torch.no_grad():
                 try:
-                    output = model.encode_image(input_batch) #이미지를 모델에 넣음
+                    output = model_avgpool(input_batch) #이미지를 모델에 넣음
                 except:
                     print(os.path.join(dir, f))
                 label_embedding[obj].append(output[0].tolist())
 
 
 
-with open('data/RN101/test_embedding5.json', 'w+') as f: 
+with open('data/Resnet101/test_embedding5.json', 'w+') as f: 
     f.write(json.dumps(label_embedding)) #json 문자열로 변환
